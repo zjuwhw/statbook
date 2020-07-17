@@ -1,0 +1,133 @@
+---
+title: "linear regression with R"
+author: "Huanwei Wang"
+date: "16/07/2020"
+output:
+    html_document:
+        toc: TRUE
+        code_folding: "hide"
+---
+
+### Simple linear regression
+
+||Equation|R built-in function|R step-by-step code|
+|--|--|--|--|
+|**Model**| $y = \beta_0+\beta_1x+\epsilon, \epsilon \sim N(0,\sigma^2)$|`fit = lm(y~x)`
+|**Estimate** (OLS)|$b_1=\frac{\sum(x_i-\bar{x})(y_i-\bar{y})}{\sum(x_i-\bar{x})^2}$<br>$b_0=\bar{y}-b_1\bar{x}$|`b1=coefficients(fit)[2]`<br>`b0=coefficients(fit)[1]`|`b1=sum((x-mean(x))*(y-mean(y)))/sum((x-mean(x))^2)`<br>`b0=mean(y)-b1*mean(x)`|
+|fitted values and residuals|$\hat{y}=b_0+b_1x$<br>$e=y-\hat{y}$|`yhat=fitted(fit)`<br>`e=residuals(fit)`|`yhat=b0+b1*x`<br>`e=y-yhat`
+|ANOVA (ANalysis Of VAriance)|$SSE = \sum(y_i-\hat{y}_i)^2$ <br> $MSE=\frac{SSE}{n-2}$|`sse=anova(fit)$"Sum Sq"[2]`<br>`mse=anova(fit)$"Mean Sq"[2]`|`sse=sum((y-yhat)^2)`<br>`mse=sse/(length(x)-2)`
+|inference|$\sigma^2(b_1)=\frac{\sigma^2}{\sum(x_i-\bar{x})^2}; s^2(b_1)=\frac{MSE}{\sum(x_i-\bar{x})^2}$|`var_b1=coefficients(summary(fit))[2,2]^2`|`var_b1=mse/sum((x-mean(x))^2)`
+|t test|$\frac{b_1}{s(b_1)} \sim t(n-2)$|`pvalue=coefficients(summary(fit))[2,4]`|`pvalue_t=2*pt(abs(b1)/sqrt(var_b1),df=length(x)-2, lower.tail=F)`|
+|F test (general linear test)|$\frac{(SSE_R-SSE_F)/(df_R-df_F)}{SSE_F/df_F} \sim F(df_R-df_F,df_F)$<br>$SSE_R=SST; SSE_F=SSE; df_R=n-1; df_F=n-2$||`pvalue_f = pf((sum((y-mean(y))^2)-sse)/1/(sse/(length(x)-2)), df1=1, df2=length(x)-2, lower.tail=F)`|
+|test if n is large|$\frac{b_1}{s(b_1)} \sim N(0,1)$<br>$\frac{b_1^2}{s^2(b_1)} \sim \chi^2(1)$||`pvalue_n =2*pnorm(abs(b1)/sqrt(var_b1), lower.tail=F)`<br>`pvalue_chisq =pchisq(b1^2/var_b1, lower.tail=F, df=1)`
+
+- OLS-Ordinary Least Square
+- SS-sum of squares; SST-total SS; SSE-error SS; SSR-regression SS
+- MS-mean square; MSE-error MS; MSR-regression MS
+- SSE_R: SSE in the reduced model; SSE_F; SSE in the full model
+- $\beta_0$ and $\beta_1$ (Greek letters) are parameters; $b_0$ and $b_1$ (Latin/Roman letters) are estimates
+- If a random variable $x \sim N(0,1)$, $x^2 \sim \chi^2(1)$
+- If a random variable $x \sim t(n)$, $x^2 \sim F(1,n)$
+- If n is large, $t(n)$ -> $N(0,1)$ and $F(1,n)$ -> $\chi^2(1)$
+
+### Simple linear regression in matrix form
+
+||Equation|R step-by-step matrix code|
+|--|--|--|
+|Model|$\boldsymbol{Y}_{n\times1}=\boldsymbol{X}_{n\times2}\boldsymbol{\beta}_{2\times1} + \boldsymbol{\epsilon}_{n\times1}$|`x = cbind(1, x)`|
+|Estimate (OLS)|$\boldsymbol{b}=\begin{bmatrix} b_0 \\b_1\end{bmatrix}=(\boldsymbol{X}'\boldsymbol{X})^{-1}\boldsymbol{X}'\boldsymbol{Y}$|`b = solve(t(x) %*% x) %*% t(x) %*% y`|
+|fitted values and residuals|$\hat{\boldsymbol{Y}}=\boldsymbol{X}\boldsymbol{b}=\boldsymbol{X}(\boldsymbol{X}'\boldsymbol{X})^{-1}\boldsymbol{X}'\boldsymbol{Y}$<br>$\boldsymbol{e}=\boldsymbol{Y}-\hat{\boldsymbol{Y}}$|`yhat=x %*% b`<br>`e=y-yhat`|
+|ANOVA (ANalysis Of VAriance)|$SSE=\boldsymbol{e}'\boldsymbol{e}=(\boldsymbol{Y}-\boldsymbol{Xb})'(\boldsymbol{Y}-\boldsymbol{Xb})=\boldsymbol{Y}'\boldsymbol{Y}-\boldsymbol{b}'\boldsymbol{X}'\boldsymbol{Y}$ <br>$MSE=\frac{SSE}{n-2}$|`sse=t(e) %*% e`<br>`mse=sse/(nrow(x)-2)`|
+|inference|$\sigma^2(\boldsymbol{b})=\begin{bmatrix} \sigma^2(b_0) & \sigma(b_0, b_1) \\ \sigma(b_0, b_1) & \sigma^2(b_1) \end{bmatrix}= \sigma^2 \times (\boldsymbol{X}'\boldsymbol{X})^{-1}$<br>$s^2(\boldsymbol{b}) = MSE \times (\boldsymbol{X}'\boldsymbol{X})^{-1}$|`var_b=as.numeric(mse)*solve(t(x) %*% x)`
+
+### Multiple linear regression with two predictors in normal and matrix form
+
+||Equation|R built-in function|R step-by-step matrix code|
+|--|--|--|--|
+|Model|$y=\beta_0+\beta_1x_1+\beta_2x_2+\epsilon$ <br> $\boldsymbol{Y}_{n\times1}=\boldsymbol{X}_{n\times3}\boldsymbol{b}_{3\times1}+\boldsymbol{\epsilon}_{n\times1}$|`fit=lm(y~x1+x2)`|`x = cbind(1, x1, x2)`|
+|Estimate(OLS)|$\boldsymbol{b}=\begin{bmatrix} b_0 \\b_1 \\ b_2\end{bmatrix}=(\boldsymbol{X}'\boldsymbol{X})^{-1}\boldsymbol{X}'\boldsymbol{Y}$|`b = coefficients(fit)`|`b = solve(t(x) %*% x) %*% t(x) %*% y`|
+|fitted values and residuals|$\hat{\boldsymbol{Y}}=\boldsymbol{X}\boldsymbol{b}=\boldsymbol{X}(\boldsymbol{X}'\boldsymbol{X})^{-1}\boldsymbol{X}'\boldsymbol{Y}$<br>$\boldsymbol{e}=\boldsymbol{Y}-\hat{\boldsymbol{Y}}$|`yhat=fitted(fit)`<br>`e=residuals(fit)`|`yhat=x %*% b`<br>`e=y-yhat`|
+|ANOVA (ANalysis Of VAriance)|$SSE=\boldsymbol{e}'\boldsymbol{e}=(\boldsymbol{Y}-\boldsymbol{Xb})'(\boldsymbol{Y}-\boldsymbol{Xb})=\boldsymbol{Y}'\boldsymbol{Y}-\boldsymbol{b}'\boldsymbol{X}'\boldsymbol{Y}$ <br>$MSE=\frac{SSE}{n-3}$|`anova(fit)`|`sse=t(e) %*% e`<br>`mse=sse/(nrow(x)-3)`
+|inference|$\sigma^2(\boldsymbol{b})= \sigma^2 \times (\boldsymbol{X}'\boldsymbol{X})^{-1}$<br>$s^2(\boldsymbol{b}) = MSE \times (\boldsymbol{X}'\boldsymbol{X})^{-1}$<br>$s^2(b_k)=[s^2(\boldsymbol{b})]_{k,k}$|`coefficients(summary(fit))[,2]^2`|`var_b=as.numeric(mse)*solve(t(x) %*% x)`|
+|test for $\beta_1=0$ (variable-added-last test, conditional test) (t test)|$\frac{b_k}{s(b_k)}\sim t(n-3)$|`coefficients(summary(fit))[,4]`|`tvalue = as.numeric(b)/sqrt(diag(var_b))`<br>`pvalue=2*pt(abs(tvalue),df=length(y)-3, lower.tail=F)`
+|test for $\beta_1=\beta_2=0$ (F test)|$\frac{(SSE_R-SSE_F)/(df_R-df_F)}{SSE_F/df_F} \sim F(df_R-df_F,df_F)$<br>$df_F=n-3; df_R=n-1$|`fstatistic=summary(fit)$"fstatistic"`<br>`pvalue=pf(fstatistic[1], df1=fstatistic[2], df2=fstatistic[3], lower.tail = F)`|`fvalue=(sum((y-mean(y))^2)-sse)/2/(sse/(length(y)-3))`
+
+
+### R code {.tabset }
+
+#### simple linear regression with built-in R function
+
+```{r}
+x = trees$Volume; y = trees$Girth
+fit <- lm(y~x)
+b1=coefficients(fit)[2]
+b0=coefficients(fit)[1]
+yhat=fitted(fit)
+e=residuals(fit)
+sse=anova(fit)$"Sum Sq"[2]
+mse=anova(fit)$"Mean Sq"[2]
+var_b1=coefficients(summary(fit))[2,2]^2
+pvalue=coefficients(summary(fit))[2,4]
+b1; b0; head(yhat); head(e); sse; mse; var_b1;pvalue
+```
+
+#### simple linear regression with step-by-step R code
+
+```{r}
+x = trees$Volume; y = trees$Girth
+b1=sum((x-mean(x))*(y-mean(y)))/sum((x-mean(x))^2)
+b0=mean(y)-b1*mean(x)
+yhat=b0+b1*x
+e=y-yhat
+sse=sum((y-yhat)^2)
+mse=sse/(length(x)-2)
+var_b1=mse/sum((x-mean(x))^2)
+pvalue_t=2*pt(abs(b1)/sqrt(var_b1),df=length(x)-2, lower.tail=F)
+pvalue_n =2*pnorm(abs(b1)/sqrt(var_b1), lower.tail=F)
+pvalue_f = pf((sum((y-mean(y))^2)-sse)/1/(sse/(length(x)-2)), df1=1, df2=length(x)-2, lower.tail=F)
+pvalue_chisq =pchisq(b1^2/var_b1, lower.tail=F, df=1)
+b1; b0; head(yhat); head(e); sse; mse; var_b1;pvalue_t; pvalue_f; pvalue_n; pvalue_chisq
+```
+
+#### simple linear regression with step-by-step R matrix code
+
+```{r}
+x = trees$Volume; y = trees$Girth
+x = cbind(1, x)
+b = solve(t(x) %*% x) %*% t(x) %*% y
+yhat=x %*% b
+e=y-yhat
+sse=t(e) %*% e
+mse=sse/(nrow(x)-2)
+var_b=as.numeric(mse)*solve(t(x) %*% x)
+b; head(yhat); head(e);sse;mse; var_b
+```
+
+#### multiple linear regression with built-in R function
+
+```{r}
+x1 = trees$Volume; x2=trees$Height; y = trees$Girth
+fit=lm(y~x1+x2)
+b = coefficients(fit)
+yhat=fitted(fit)
+e=residuals(fit)
+fstatistic=summary(fit)$"fstatistic"
+pvalue=pf(fstatistic[1], df1=fstatistic[2], df2=fstatistic[3], lower.tail = F)
+b; head(yhat); head(e); anova(fit); coefficients(summary(fit))[,2]^2; coefficients(summary(fit))[,4]; fstatistic;pvalue
+```
+
+#### multiple linear regression with step-by-step R matrix code
+```{r}
+x1 = trees$Volume; x2=trees$Height; y = trees$Girth
+x = cbind(1, x1, x2)
+b = solve(t(x) %*% x) %*% t(x) %*% y
+yhat=x %*% b
+e=y-yhat
+sse=t(e) %*% e
+mse=sse/(nrow(x)-3)
+var_b=as.numeric(mse)*solve(t(x) %*% x)
+tvalue = as.numeric(b)/sqrt(diag(var_b))
+pvalue=2*pt(abs(tvalue),df=length(y)-3, lower.tail=F)
+fvalue=(sum((y-mean(y))^2)-sse)/2/(sse/(length(y)-3))
+b; head(yhat); head(e);sse;mse; var_b; tvalue; pvalue; fvalue
+```
